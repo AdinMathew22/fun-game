@@ -24,14 +24,18 @@ class Player {
     this.dy = 0;
     this.speed = 5;
     this.jumpStrength = 10;
-    this.jumpsUsed = 0; // Track jumps used
-    this.maxJumps = 2; // Allow 2 jumps
-    this.isOnGround = false; // Track if on the ground
+    this.jumpsUsed = 0;
+    this.maxJumps = 2;
+    this.isOnGround = false;
     this.controls = controls;
     this.invertColors = invertColors;
     this.blockedLeft = false;
     this.blockedRight = false;
     this.blockedTop = false;
+
+    // Health properties (10 hearts, each heart is worth 2 points)
+    this.maxHealth = 20; // Total health points (10 hearts * 2)
+    this.health = 20; // Start with full health
   }
 
   draw() {
@@ -43,6 +47,49 @@ class Player {
     } else {
       ctx.drawImage(characterImage, this.x, this.y, this.width, this.height);
     }
+
+    this.drawHealthBar(); // Draw the health bar above the player
+  }
+
+  drawHealthBar() {
+    const barWidth = 50;
+    const barHeight = 5;
+    const barX = this.x + (this.width - barWidth) / 2; // Center above the player
+    const barY = this.y - 15; // Slightly above the player
+
+    // Calculate health percentage
+    const healthPercent = this.health / this.maxHealth;
+
+    // Interpolate between green (healthy) and red (low health)
+    const red = Math.floor((1 - healthPercent) * 255);
+    const green = Math.floor(healthPercent * 255);
+    ctx.fillStyle = `rgb(${red}, ${green}, 0)`;
+
+    // Draw health bar
+    ctx.fillRect(barX, barY, barWidth * healthPercent, barHeight);
+
+    // Draw hearts below the health bar
+    this.drawHearts(barX, barY - 15);
+  }
+
+  drawHearts(x, y) {
+    const heartWidth = 10;
+    const heartSpacing = 5; // Spacing between hearts
+
+    for (let i = 0; i < 10; i++) {
+      const isFullHeart = this.health >= (i + 1) * 2;
+      const isHalfHeart = this.health >= (i * 2) + 1 && this.health < (i + 1) * 2;
+
+      if (isFullHeart) {
+        ctx.fillStyle = 'red'; // Full heart
+      } else if (isHalfHeart) {
+        ctx.fillStyle = 'pink'; // Half heart
+      } else {
+        ctx.fillStyle = 'gray'; // Empty heart
+      }
+
+      ctx.fillRect(x + i * (heartWidth + heartSpacing), y, heartWidth, heartWidth);
+    }
   }
 
   update() {
@@ -53,10 +100,10 @@ class Player {
     if (this.y + this.height >= canvas.height - 50) {
       this.y = canvas.height - this.height - 50;
       this.dy = 0;
-      this.isOnGround = true; // Player is on the ground
-      this.jumpsUsed = 0; // Reset jumps when on ground
+      this.isOnGround = true;
+      this.jumpsUsed = 0;
     } else {
-      this.isOnGround = false; // Player is in the air
+      this.isOnGround = false;
     }
 
     // Screen wrapping
@@ -75,26 +122,29 @@ class Player {
     }
 
     if (keysPressed[this.controls.jump]) {
-      this.jump(); // Call jump only on new key press
+      this.jump();
     }
 
     if (keys[this.controls.crouch]) {
-      this.height = this.crouchHeight; // Shrink when crouching
+      this.height = this.crouchHeight;
     } else {
-      this.height = this.originalHeight; // Reset height when not crouching
+      this.height = this.originalHeight;
     }
   }
 
   jump() {
-    // Allow jump if on ground or one air jump in the air
     if (this.jumpsUsed < this.maxJumps) {
-      this.dy = -this.jumpStrength; // Apply upward force
-      this.jumpsUsed++; // Increment the jump counter
+      this.dy = -this.jumpStrength;
+      this.jumpsUsed++;
     }
   }
 
   getHitbox() {
     return { x: this.x, y: this.y, width: this.width, height: this.height };
+  }
+
+  takeDamage(amount) {
+    this.health = Math.max(0, this.health - amount); // Decrease health, but don't go below 0
   }
 }
 
@@ -123,12 +173,12 @@ const keysPressed = {};
 // Event listeners for key presses
 window.addEventListener('keydown', (e) => {
   keys[e.key] = true;
-  keysPressed[e.key] = true; // Track new key presses
+  keysPressed[e.key] = true;
 });
 
 window.addEventListener('keyup', (e) => {
   keys[e.key] = false;
-  keysPressed[e.key] = false; // Reset key press
+  keysPressed[e.key] = false;
 });
 
 // Function to handle collisions between players
@@ -143,31 +193,8 @@ function handleCollision(playerA, playerB) {
     hitboxA.y + hitboxA.height > hitboxB.y;
 
   if (isColliding) {
-    const overlapX = Math.min(hitboxA.x + hitboxA.width - hitboxB.x, hitboxB.x + hitboxB.width - hitboxA.x);
-    const overlapY = Math.min(hitboxA.y + hitboxA.height - hitboxB.y, hitboxB.y + hitboxB.height - hitboxA.y);
-
-    if (overlapX < overlapY) {
-      // Horizontal collision
-      if (hitboxA.x < hitboxB.x) {
-        playerA.blockedRight = true;
-      } else {
-        playerA.blockedLeft = true;
-      }
-    } else {
-      // Vertical collision (stacking)
-      if (hitboxA.y < hitboxB.y) {
-        playerA.y = hitboxB.y - playerA.height;
-        playerA.dy = 0; // Stop falling
-        playerA.jumpsUsed = 0; // Reset jumps when landing on another player
-      } else {
-        playerA.blockedTop = true;
-      }
-    }
-  } else {
-    // Reset movement restrictions when no collision
-    playerA.blockedLeft = false;
-    playerA.blockedRight = false;
-    playerA.blockedTop = false;
+    playerA.takeDamage(1); // Each collision decreases health by 1 point
+    playerB.takeDamage(1);
   }
 }
 
@@ -183,11 +210,9 @@ function gameLoop() {
   player2.update();
   player2.move(keys, keysPressed);
 
-  // Handle collisions between players
   handleCollision(player1, player2);
   handleCollision(player2, player1);
 
-  // Reset keysPressed after each frame
   for (let key in keysPressed) {
     keysPressed[key] = false;
   }
