@@ -19,13 +19,14 @@ class Player {
     this.y = y;
     this.width = 50;
     this.height = 50;
-    this.originalHeight = 50; // Store original height
-    this.crouchHeight = 30;   // Height when crouching
+    this.originalHeight = 50;
+    this.crouchHeight = 30;
     this.dy = 0;
     this.speed = 5;
     this.jumpStrength = 10;
-    this.canAirJump = true;
-    this.onGround = false;
+    this.jumpsUsed = 0; // Track jumps used
+    this.maxJumps = 2; // Allow 2 jumps
+    this.isOnGround = false; // Track if on the ground
     this.controls = controls;
     this.invertColors = invertColors;
     this.blockedLeft = false;
@@ -45,46 +46,50 @@ class Player {
   }
 
   update() {
-    if (!this.blockedTop) {
-      this.dy += 0.5; // Gravity
-    }
+    this.dy += 0.5; // Gravity
     this.y += this.dy;
 
+    // Stop at floor
     if (this.y + this.height >= canvas.height - 50) {
       this.y = canvas.height - this.height - 50;
       this.dy = 0;
-      this.canAirJump = true;
-      this.onGround = true;
+      this.isOnGround = true; // Player is on the ground
+      this.jumpsUsed = 0; // Reset jumps when on ground
     } else {
-      this.onGround = false;
+      this.isOnGround = false; // Player is in the air
     }
 
-    // Screen wrapping (left and right)
+    // Screen wrapping
     if (this.x + this.width < 0) this.x = canvas.width;
     if (this.x > canvas.width) this.x = -this.width;
 
     this.draw();
   }
 
-  move(keys) {
+  move(keys, keysPressed) {
     if (keys[this.controls.left] && !this.blockedLeft) {
       this.x -= this.speed;
     }
     if (keys[this.controls.right] && !this.blockedRight) {
       this.x += this.speed;
     }
-    if (keys[this.controls.jump]) {
-      if (this.onGround) {
-        this.dy = -this.jumpStrength;
-      } else if (this.canAirJump) {
-        this.dy = -this.jumpStrength;
-        this.canAirJump = false;
-      }
+
+    if (keysPressed[this.controls.jump]) {
+      this.jump(); // Call jump only on new key press
     }
+
     if (keys[this.controls.crouch]) {
-      this.height = this.crouchHeight; // Shrink height when crouching
+      this.height = this.crouchHeight; // Shrink when crouching
     } else {
-      this.height = this.originalHeight; // Restore height when not crouching
+      this.height = this.originalHeight; // Reset height when not crouching
+    }
+  }
+
+  jump() {
+    // Allow jump if on ground or one air jump in the air
+    if (this.jumpsUsed < this.maxJumps) {
+      this.dy = -this.jumpStrength; // Apply upward force
+      this.jumpsUsed++; // Increment the jump counter
     }
   }
 
@@ -113,12 +118,20 @@ const player2 = new Player(600, 300, { left: 'ArrowLeft', right: 'ArrowRight', j
 const floor = new Floor();
 
 const keys = {};
+const keysPressed = {};
 
 // Event listeners for key presses
-window.addEventListener('keydown', (e) => keys[e.key] = true);
-window.addEventListener('keyup', (e) => keys[e.key] = false);
+window.addEventListener('keydown', (e) => {
+  keys[e.key] = true;
+  keysPressed[e.key] = true; // Track new key presses
+});
 
-// Function to detect and resolve collisions between two players
+window.addEventListener('keyup', (e) => {
+  keys[e.key] = false;
+  keysPressed[e.key] = false; // Reset key press
+});
+
+// Function to handle collisions between players
 function handleCollision(playerA, playerB) {
   const hitboxA = playerA.getHitbox();
   const hitboxB = playerB.getHitbox();
@@ -134,26 +147,24 @@ function handleCollision(playerA, playerB) {
     const overlapY = Math.min(hitboxA.y + hitboxA.height - hitboxB.y, hitboxB.y + hitboxB.height - hitboxA.y);
 
     if (overlapX < overlapY) {
-      // Horizontal collision resolution
+      // Horizontal collision
       if (hitboxA.x < hitboxB.x) {
         playerA.blockedRight = true;
       } else {
         playerA.blockedLeft = true;
       }
     } else {
-      // Vertical collision resolution (stacking)
+      // Vertical collision (stacking)
       if (hitboxA.y < hitboxB.y) {
-        // Player A lands on Player B
         playerA.y = hitboxB.y - playerA.height;
         playerA.dy = 0; // Stop falling
-        playerA.onGround = true;
+        playerA.jumpsUsed = 0; // Reset jumps when landing on another player
       } else {
-        // Player A hits the bottom of Player B
         playerA.blockedTop = true;
       }
     }
   } else {
-    // Reset movement restrictions if no collision
+    // Reset movement restrictions when no collision
     playerA.blockedLeft = false;
     playerA.blockedRight = false;
     playerA.blockedTop = false;
@@ -167,14 +178,19 @@ function gameLoop() {
   floor.draw();
 
   player1.update();
-  player1.move(keys);
+  player1.move(keys, keysPressed);
 
   player2.update();
-  player2.move(keys);
+  player2.move(keys, keysPressed);
 
   // Handle collisions between players
   handleCollision(player1, player2);
   handleCollision(player2, player1);
+
+  // Reset keysPressed after each frame
+  for (let key in keysPressed) {
+    keysPressed[key] = false;
+  }
 
   requestAnimationFrame(gameLoop);
 }
