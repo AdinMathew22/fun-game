@@ -12,6 +12,9 @@ characterImage.src = 'character.png';
 const floorImage = new Image();
 floorImage.src = 'floor.png';
 
+const projectileImage = new Image();
+projectileImage.src = 'OBL.png';
+
 // Player class
 class Player {
   constructor(x, y, controls, invertColors = false) {
@@ -29,13 +32,14 @@ class Player {
     this.isOnGround = false;
     this.controls = controls;
     this.invertColors = invertColors;
+    this.projectiles = [];
     this.blockedLeft = false;
     this.blockedRight = false;
     this.blockedTop = false;
 
     // Health properties (10 hearts, each heart is worth 2 points)
-    this.maxHealth = 20; // Total health points (10 hearts * 2)
-    this.health = 20; // Start with full health
+    this.maxHealth = 20;
+    this.health = 20;
   }
 
   draw() {
@@ -48,47 +52,29 @@ class Player {
       ctx.drawImage(characterImage, this.x, this.y, this.width, this.height);
     }
 
-    this.drawHealthBar(); // Draw the health bar above the player
-  }
-
-  drawHealthBar() {
-    const barWidth = 50;
-    const barHeight = 5;
-    const barX = this.x + (this.width - barWidth) / 2; // Center above the player
-    const barY = this.y - 15; // Slightly above the player
-
-    // Calculate health percentage
-    const healthPercent = this.health / this.maxHealth;
-
-    // Interpolate between green (healthy) and red (low health)
-    const red = Math.floor((1 - healthPercent) * 255);
-    const green = Math.floor(healthPercent * 255);
-    ctx.fillStyle = `rgb(${red}, ${green}, 0)`;
-
-    // Draw health bar
-    ctx.fillRect(barX, barY, barWidth * healthPercent, barHeight);
-
-    // Draw hearts below the health bar
-    this.drawHearts(barX, barY - 15);
+    // Draw hearts below the player
+    this.drawHearts(this.x, this.y - 15);
   }
 
   drawHearts(x, y) {
-    const heartWidth = 10;
-    const heartSpacing = 5; // Spacing between hearts
+    const totalHearts = 10;
+    const heartSpacing = 2;
+    const heartWidth = (this.width - heartSpacing * (totalHearts - 1)) / totalHearts;
+    const heartHeight = heartWidth;
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < totalHearts; i++) {
       const isFullHeart = this.health >= (i + 1) * 2;
       const isHalfHeart = this.health >= (i * 2) + 1 && this.health < (i + 1) * 2;
 
       if (isFullHeart) {
-        ctx.fillStyle = 'red'; // Full heart
+        ctx.fillStyle = 'red';
       } else if (isHalfHeart) {
-        ctx.fillStyle = 'pink'; // Half heart
+        ctx.fillStyle = 'pink';
       } else {
-        ctx.fillStyle = 'gray'; // Empty heart
+        ctx.fillStyle = 'gray';
       }
 
-      ctx.fillRect(x + i * (heartWidth + heartSpacing), y, heartWidth, heartWidth);
+      ctx.fillRect(x + i * (heartWidth + heartSpacing), y, heartWidth, heartHeight);
     }
   }
 
@@ -110,6 +96,9 @@ class Player {
     if (this.x + this.width < 0) this.x = canvas.width;
     if (this.x > canvas.width) this.x = -this.width;
 
+    // Update projectiles
+    this.projectiles = this.projectiles.filter((proj) => proj.update());
+
     this.draw();
   }
 
@@ -130,6 +119,11 @@ class Player {
     } else {
       this.height = this.originalHeight;
     }
+
+    // Fire projectiles
+    if (keysPressed[this.controls.fire]) {
+      this.fireProjectile();
+    }
   }
 
   jump() {
@@ -139,14 +133,49 @@ class Player {
     }
   }
 
+  fireProjectile() {
+    const direction = this.controls.left === 'a' ? 1 : -1; // Determine projectile direction based on player controls
+    this.projectiles.push(new Projectile(this.x + this.width / 2, this.y + this.height / 2, direction));
+  }
+
   getHitbox() {
     return { x: this.x, y: this.y, width: this.width, height: this.height };
   }
 
   takeDamage(amount) {
-    this.health = Math.max(0, this.health - amount); // Decrease health, but don't go below 0
+    this.health = Math.max(0, this.health - amount);
   }
 }
+
+// Projectile class
+// Projectile class
+class Projectile {
+  constructor(x, y, direction) {
+    this.x = x;
+    this.y = y;
+    this.width = 40; // Increased width
+    this.height = 20; // Increased height
+    this.speed = 10; // Semi-fast speed
+    this.direction = direction;
+  }
+
+  update() {
+    this.x += this.speed * this.direction;
+
+    // Check if the projectile is still within canvas bounds
+    if (this.x + this.width < 0 || this.x > canvas.width) {
+      return false; // Remove projectile
+    }
+
+    this.draw();
+    return true; // Keep projectile
+  }
+
+  draw() {
+    ctx.drawImage(projectileImage, this.x, this.y, this.width, this.height);
+  }
+}
+
 
 // Floor class
 class Floor {
@@ -163,8 +192,8 @@ class Floor {
 }
 
 // Create players and floor
-const player1 = new Player(100, 300, { left: 'a', right: 'd', jump: 'w', crouch: 's' });
-const player2 = new Player(600, 300, { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', crouch: 'ArrowDown' }, true);
+const player1 = new Player(100, 300, { left: 'a', right: 'd', jump: 'w', crouch: 's', fire: ' ' });
+const player2 = new Player(600, 300, { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', crouch: 'ArrowDown', fire: '/' }, true);
 const floor = new Floor();
 
 const keys = {};
@@ -181,23 +210,6 @@ window.addEventListener('keyup', (e) => {
   keysPressed[e.key] = false;
 });
 
-// Function to handle collisions between players
-function handleCollision(playerA, playerB) {
-  const hitboxA = playerA.getHitbox();
-  const hitboxB = playerB.getHitbox();
-
-  const isColliding =
-    hitboxA.x < hitboxB.x + hitboxB.width &&
-    hitboxA.x + hitboxA.width > hitboxB.x &&
-    hitboxA.y < hitboxB.y + hitboxB.height &&
-    hitboxA.y + hitboxA.height > hitboxB.y;
-
-  if (isColliding) {
-    playerA.takeDamage(1); // Each collision decreases health by 1 point
-    playerB.takeDamage(1);
-  }
-}
-
 // Game loop
 function gameLoop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -209,9 +221,6 @@ function gameLoop() {
 
   player2.update();
   player2.move(keys, keysPressed);
-
-  handleCollision(player1, player2);
-  handleCollision(player2, player1);
 
   for (let key in keysPressed) {
     keysPressed[key] = false;
