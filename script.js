@@ -40,6 +40,7 @@ class Player {
     // Health properties (10 hearts, each heart is worth 2 points)
     this.maxHealth = 20;
     this.health = 20;
+    this.alive = true;
   }
 
   draw() {
@@ -79,6 +80,8 @@ class Player {
   }
 
   update() {
+    if (!this.alive) return; // Don't update if the player is dead
+
     this.dy += 0.5; // Gravity
     this.y += this.dy;
 
@@ -103,6 +106,8 @@ class Player {
   }
 
   move(keys, keysPressed) {
+    if (!this.alive) return; // Don't allow movement if the player is dead
+
     if (keys[this.controls.left] && !this.blockedLeft) {
       this.x -= this.speed;
     }
@@ -135,7 +140,7 @@ class Player {
 
   fireProjectile() {
     const direction = this.controls.left === 'a' ? 1 : -1; // Determine projectile direction based on player controls
-    this.projectiles.push(new Projectile(this.x + this.width / 2, this.y + this.height / 2, direction));
+    this.projectiles.push(new Projectile(this.x + this.width / 2, this.y + this.height / 2, direction, this));
   }
 
   getHitbox() {
@@ -144,19 +149,40 @@ class Player {
 
   takeDamage(amount) {
     this.health = Math.max(0, this.health - amount);
+    if (this.health === 0) {
+      this.alive = false;
+    }
+  }
+
+  checkCollisionWithProjectiles(otherPlayer) {
+    this.projectiles.forEach((projectile, index) => {
+      if (this.isColliding(projectile, otherPlayer.getHitbox())) {
+        otherPlayer.takeDamage(2); // Each hit takes away 1 heart (2 health points)
+        this.projectiles.splice(index, 1); // Remove the projectile after hitting
+      }
+    });
+  }
+
+  isColliding(proj, hitbox) {
+    return (
+      proj.x < hitbox.x + hitbox.width &&
+      proj.x + proj.width > hitbox.x &&
+      proj.y < hitbox.y + hitbox.height &&
+      proj.y + proj.height > hitbox.y
+    );
   }
 }
 
 // Projectile class
-// Projectile class
 class Projectile {
-  constructor(x, y, direction) {
+  constructor(x, y, direction, owner) {
     this.x = x;
     this.y = y;
     this.width = 40; // Increased width
     this.height = 20; // Increased height
     this.speed = 10; // Semi-fast speed
     this.direction = direction;
+    this.owner = owner;
   }
 
   update() {
@@ -175,7 +201,6 @@ class Projectile {
     ctx.drawImage(projectileImage, this.x, this.y, this.width, this.height);
   }
 }
-
 
 // Floor class
 class Floor {
@@ -210,17 +235,37 @@ window.addEventListener('keyup', (e) => {
   keysPressed[e.key] = false;
 });
 
+// Function to display win message
+function displayWinMessage(message) {
+  ctx.font = '50px Arial';
+  ctx.fillStyle = 'black';
+  ctx.textAlign = 'center';
+  ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+}
+
 // Game loop
 function gameLoop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   floor.draw();
 
-  player1.update();
-  player1.move(keys, keysPressed);
+  if (player1.alive && player2.alive) {
+    player1.update();
+    player1.move(keys, keysPressed);
+    player2.update();
+    player2.move(keys, keysPressed);
 
-  player2.update();
-  player2.move(keys, keysPressed);
+    // Check for projectile collisions between players
+    player1.checkCollisionWithProjectiles(player2);
+    player2.checkCollisionWithProjectiles(player1);
+  } else {
+    // Display winning message
+    if (!player2.alive) {
+      displayWinMessage("White Wins!");
+    } else if (!player1.alive) {
+      displayWinMessage("Black Wins!");
+    }
+  }
 
   for (let key in keysPressed) {
     keysPressed[key] = false;
