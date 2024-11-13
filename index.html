@@ -5,9 +5,54 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Two-Player Platformer Game</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body, html {
+      height: 100%;
+      width: 100%;
+    }
+
+    .game-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .video-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border: none;
+    }
+
+    #gameCanvas {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      background-color: transparent;
+    }
+  </style>
 </head>
 <body>
   <div class="game-container">
+    <div class="video-container">
+      <iframe src="https://www.youtube.com/embed/3xWJ0FSgJVE?autoplay=1&mute=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
     <canvas id="gameCanvas"></canvas>
   </div>
   <script src="script.js"></script>

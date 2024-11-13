@@ -17,18 +17,18 @@ projectileImage.src = 'OBL.png';
 
 // Player class
 class Player {
-  constructor(x, y, controls, invertColors = false) {
+  constructor(x, y, controls, invertColors = false,height,width) {
     this.x = x;
     this.y = y;
-    this.width = 50;
-    this.height = 50;
-    this.originalHeight = 50;
-    this.crouchHeight = 30;
+    this.width = width;
+    this.height = height;
+    this.originalHeight = height;
+    this.crouchHeight = height-20;
     this.dy = 0;
     this.speed = 5;
     this.jumpStrength = 10;
     this.jumpsUsed = 0;
-    this.maxJumps = 2;
+    this.maxJumps = 3;
     this.isOnGround = false;
     this.controls = controls;
     this.invertColors = invertColors;
@@ -217,8 +217,8 @@ class Floor {
 }
 
 // Create players and floor
-const player1 = new Player(100, 300, { left: 'a', right: 'd', jump: 'w', crouch: 's', fire: ' ' });
-const player2 = new Player(600, 300, { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', crouch: 'ArrowDown', fire: '/' }, true);
+const player1 = new Player(100, 300, { left: 'a', right: 'd', jump: 'w', crouch: 's', fire: ' ' },false,50,50);
+const player2 = new Player(600, 300, { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', crouch: 'ArrowDown', fire: '/' }, true, 100,20);
 const floor = new Floor();
 
 const keys = {};
@@ -236,11 +236,19 @@ window.addEventListener('keyup', (e) => {
 });
 
 // Function to display win message
-function displayWinMessage(message) {
+function displayWinMessageWhite() {
   ctx.font = '50px Arial';
+
+  ctx.fillStyle = 'white';
+  ctx.textAlign = 'center';
+  ctx.fillText("White Wins!", canvas.width / 2, canvas.height / 2);
+}
+function displayWinMessageBlack() {
+  ctx.font = '50px Arial';
+  
   ctx.fillStyle = 'black';
   ctx.textAlign = 'center';
-  ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+  ctx.fillText("Black Wins!", canvas.width / 2, canvas.height / 2);
 }
 
 // Game loop
@@ -261,9 +269,9 @@ function gameLoop() {
   } else {
     // Display winning message
     if (!player2.alive) {
-      displayWinMessage("White Wins!");
+      displayWinMessageWhite();
     } else if (!player1.alive) {
-      displayWinMessage("Black Wins!");
+      displayWinMessageBlack();T
     }
   }
 
